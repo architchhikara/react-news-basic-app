@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import axios from "axios";
+import PropTypes from "prop-types";
 import "./App.css";
 
 const DEFAULT_QUERY = "";
@@ -10,6 +11,8 @@ const PATH_SEARCH = "/search";
 const PARAM_SEARCH = "query=";
 const PARAM_PAGE = "page=";
 const PARAM_HPP = "hitsPerPage=";
+
+const Loading = () => <div>Loading ...</div>
 
 const list = [
   {
@@ -46,7 +49,8 @@ class App extends Component {
       results: null,
       searchKey: "",
       searchTerm: DEFAULT_QUERY,
-      error: null
+      error: null,
+      isLoading: false
     };
 
     this.onDismiss = this.onDismiss.bind(this);
@@ -67,31 +71,22 @@ class App extends Component {
     this.setState({
       results: {
         ...results,
-        [searchKey]: { hits: updatedHits, page }
+        [searchKey]: { hits: updatedHits, page },
+        isLoading: false
       }
     });
   }
 
-  onSearchSubmit(event) {
-    const { searchTerm } = this.state;
-    this.setState({ searchKey: searchTerm });
-
-    if (this.needsToSearchTopStories(searchTerm)) {
-      this.fetchSearchTopStories(searchTerm);
-    }
-
-    event.preventDefault();
-  }
-
-  needsToSearchTopStories(searchTerm) {
-    return !this.state.results[searchTerm];
-  }
-
   fetchSearchTopStories(searchTerm, page = 0) {
+    this.setState({ isLoading: true });
     axios(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}\
 ${page}&${PARAM_HPP}${DEFAULT_HPP}`)
       .then(result => this._isMounted && this.setSearchTopStories(result.data))
       .catch(error => this._isMounted && this.setState({ error }));
+  }
+
+  needsToSearchTopStories(searchTerm) {
+    return !this.state.results[searchTerm];
   }
 
   onDismiss(id) {
@@ -107,6 +102,17 @@ ${page}&${PARAM_HPP}${DEFAULT_HPP}`)
         [searchKey]: { hits: updatedHits, page }
       }
     });
+  }
+
+  onSearchSubmit(event) {
+    const { searchTerm } = this.state;
+    this.setState({ searchKey: searchTerm });
+
+    if (this.needsToSearchTopStories(searchTerm)) {
+      this.fetchSearchTopStories(searchTerm);
+    }
+
+    event.preventDefault();
   }
 
   onSearchChange(event) {
@@ -125,7 +131,7 @@ ${page}&${PARAM_HPP}${DEFAULT_HPP}`)
   }
 
   render() {
-    const { searchTerm, results, searchKey, error } = this.state;
+    const { searchTerm, results, searchKey, error, isLoading } = this.state;
     const page =
       (results && results[searchKey] && results[searchKey].page) || 0;
     const list =
@@ -152,6 +158,15 @@ ${page}&${PARAM_HPP}${DEFAULT_HPP}`)
         ) : (
           <Table list={list} onDismiss={this.onDismiss} />
         )}
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <Button
+            onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}
+          >
+            More
+          </Button>
+        )}
 
         {results && <Table list={list} onDismiss={this.onDismiss} />}
 
@@ -162,6 +177,7 @@ ${page}&${PARAM_HPP}${DEFAULT_HPP}`)
             More
           </Button>
         </div>
+        
       </div>
     );
   }
@@ -199,10 +215,31 @@ const Table = ({ list, onDismiss }) => (
   </div>
 );
 
-const Button = ({ onClick, className = "", children }) => (
+const Button = ({ onClick, className, children }) => (
   <button onClick={onClick} className={className} type="button">
     {children}
   </button>
 );
+Button.defaultProps = {
+  className: ""
+};
+
+Button.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  className: PropTypes.string,
+  children: PropTypes.node.isRequired
+};
+
+Table.propTypes = {
+  list: PropTypes.array.isRequired,
+  onDismiss: PropTypes.func.isRequired
+};
+
+const withLoading = (Component) => (props) =>
+  props.isLoading
+    ? <Loading />
+    : <Component { ...props } />
 
 export default App;
+
+export { Button, Search, Table };
